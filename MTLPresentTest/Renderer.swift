@@ -13,7 +13,7 @@ class Renderer {
 	let indices: MTLBuffer
 	let rpdesc: MTLRenderPassDescriptor
 	let pipe: MTLRenderPipelineState
-	let signpost = OSSignposter(subsystem: "Renderer", category: .pointsOfInterest)
+	let signpost = OSLog(subsystem: "Renderer", category: .pointsOfInterest)
 	var texSize = (width: 0, height: 0)
 	public var usePresentDrawable: Bool = true
 	public var vsync: Bool = false { didSet { layer.displaySyncEnabled = vsync } }
@@ -50,7 +50,6 @@ class Renderer {
 		bufferPtr = buffer.contents().bindMemory(to: Float.self, capacity: Self.MAX_HISTORY)
 		memset(buffer.contents(), 0, Self.BUFFER_LEN)
 		rpdesc = MTLRenderPassDescriptor()
-		rpdesc.defaultRasterSampleCount = Int(msaa)
 		rpdesc.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
 		rpdesc.colorAttachments[0].loadAction = .clear
 		rpdesc.colorAttachments[0].storeAction = .multisampleResolve
@@ -89,9 +88,10 @@ class Renderer {
 
 	func runFrame() {
 		let start = DispatchTime.now()
-		let sgn = signpost.beginInterval("NextDrawable")
-		let drawable = layer.nextDrawable()!
-		signpost.endInterval("NextDrawable", sgn)
+		let drawable: CAMetalDrawable
+		os_signpost(.begin, log: signpost, name: "NextDrawable")
+		drawable = layer.nextDrawable()!
+		os_signpost(.end, log: signpost, name: "NextDrawable")
 		let end = DispatchTime.now()
 		let cb = queue.makeCommandBuffer()!
 		cb.label = "Render CB"
@@ -102,7 +102,10 @@ class Renderer {
 			if texSize.width != width || texSize.height != height {
 				let tdesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: outTex.pixelFormat, width: width, height: height, mipmapped: false)
 				tdesc.usage = .renderTarget
-				tdesc.storageMode = device.supportsFamily(.apple1) ? .memoryless : .private
+				tdesc.storageMode = .private
+				if #available(macOS 11, *), device.supportsFamily(.apple1) {
+					tdesc.storageMode = .memoryless
+				}
 				tdesc.textureType = .type2DMultisample
 				tdesc.sampleCount = Int(msaa)
 				let tex = device.makeTexture(descriptor: tdesc)!
@@ -146,11 +149,12 @@ class Renderer {
 		} else {
 			cb.addScheduledHandler { _ in drawable.present() }
 		}
-		if signpost.isEnabled {
-			let id = signpost.makeSignpostID(from: cb)
-			let sgn = signpost.beginInterval("Render", id: id)
-			cb.addCompletedHandler { [signpost, sgn] _ in
-				signpost.endInterval("Render", sgn)
+		if signpost.signpostsEnabled {
+			let signpost = signpost
+			let id = OSSignpostID(log: signpost, object: cb)
+			os_signpost(.begin, log: signpost, name: "Render", signpostID: id)
+			cb.addCompletedHandler { _ in
+				os_signpost(.end, log: signpost, name: "Render", signpostID: id)
 			}
 		}
 		cb.commit()
