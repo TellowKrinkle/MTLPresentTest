@@ -1,5 +1,6 @@
 import Metal
 import QuartzCore
+import OSLog
 
 class Renderer {
 	static let MAX_HISTORY = 65536
@@ -12,6 +13,7 @@ class Renderer {
 	let indices: MTLBuffer
 	let rpdesc: MTLRenderPassDescriptor
 	let pipe: MTLRenderPipelineState
+	let signpost = OSSignposter(subsystem: "Renderer", category: .pointsOfInterest)
 	var texSize = (width: 0, height: 0)
 	public var usePresentDrawable: Bool = true
 	public var vsync: Bool = false { didSet { layer.displaySyncEnabled = vsync } }
@@ -87,7 +89,9 @@ class Renderer {
 
 	func runFrame() {
 		let start = DispatchTime.now()
+		let sgn = signpost.beginInterval("NextDrawable")
 		let drawable = layer.nextDrawable()!
+		signpost.endInterval("NextDrawable", sgn)
 		let end = DispatchTime.now()
 		let cb = queue.makeCommandBuffer()!
 		cb.label = "Render CB"
@@ -141,6 +145,13 @@ class Renderer {
 			cb.present(drawable)
 		} else {
 			cb.addScheduledHandler { _ in drawable.present() }
+		}
+		if signpost.isEnabled {
+			let id = signpost.makeSignpostID(from: cb)
+			let sgn = signpost.beginInterval("Render", id: id)
+			cb.addCompletedHandler { [signpost, sgn] _ in
+				signpost.endInterval("Render", sgn)
+			}
 		}
 		cb.commit()
 	}

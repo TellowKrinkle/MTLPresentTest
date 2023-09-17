@@ -109,6 +109,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	@objc func threadFunc(obj: NSObject?) {
+		pthread_setname_np("Render Thread")
 		let renderer = self.renderer!
 		var run = true
 		while run {
