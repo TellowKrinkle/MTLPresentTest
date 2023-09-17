@@ -25,11 +25,11 @@ vertex V2F vs(uint vid [[vertex_id]], device const float* data [[buffer(0)]], co
 	bool isBottom = vid & 2;
 	float ns = data[idx];
 	float height = saturate(ns * cfg.heightAdjust);
-	half color = saturate(height * 2);
+	half color = saturate(half(height) * 2.h) * 2.h;
 	float width = cfg.invHalfWindowSize;
 	V2F out;
 	out.pos = float4(1 - (outpos + isLeft) * width, isBottom ? -height : height, 0, 1);
-	out.color = half3(color, 1.h - color, 0);
+	out.color = half3(saturate(color), saturate(2.h - color), 0);
 	return out;
 }
 
