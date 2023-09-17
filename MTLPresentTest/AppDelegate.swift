@@ -50,6 +50,8 @@ class Responder: NSResponder {
 				delegate.sendMessage(.zoomIn)
 			case "-":
 				delegate.sendMessage(.zoomOut)
+			case "m":
+				NSCursor.setHiddenUntilMouseMoves(true)
 			default:
 				break
 			}

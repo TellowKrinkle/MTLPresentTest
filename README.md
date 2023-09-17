@@ -10,3 +10,4 @@ Use the following keys to control the application
 - `p`: Switch between using `[MTLCommandBuffer presentDrawable:]` and `[MTLDrawable present]`
 - `t`: Switch between double and triple buffering
 - `v`: Toggle vsync
+- `m`: Hide cursor
